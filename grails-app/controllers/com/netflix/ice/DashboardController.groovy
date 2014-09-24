@@ -15,7 +15,7 @@
  *     limitations under the License.
  *
  */
-
+ 
 package com.netflix.ice
 
 import grails.converters.JSON
@@ -99,7 +99,7 @@ class DashboardController {
 
     def getResourceGroupLists = {
         List<List<Product>> products = getConfig().resourceService.getProductsWithResources();
-
+        print products;
         def result = [];
         for (List<Product> productList: products) {
             def resourceGroups = Sets.newTreeSet();
@@ -330,6 +330,15 @@ class DashboardController {
         render result as JSON
     }
 
+    def getApplicationGroups = {
+
+        Map<String, ApplicationGroup> appgroups = getConfig().applicationGroupService.getApplicationGroups();
+        def result = appgroups.values();
+        result = result == null ? [status: 404] : [status: 200, data: result];
+        render result as JSON
+    }
+    
+
     def saveApplicationGroup = {
         def text = request.reader.text;
         getConfig().applicationGroupService.saveApplicationGroup(new ApplicationGroup(text));
@@ -381,6 +390,8 @@ class DashboardController {
 
     def breakdown = {}
 
+    def resbreakdown = {}
+
     def editappgroup = {}
 
     def appgroup = {}
@@ -392,6 +403,32 @@ class DashboardController {
         }
 
         TagType groupBy = query.getString("groupBy").equals("None") ? null : TagType.valueOf(query.getString("groupBy"));
+        boolean resbreakdown = query.has("resbreakdown") ? query.getBoolean("resbreakdown") : false ;
+
+        if (groupBy == TagType.ApplicationGroup && resbreakdown) {
+            HashSet<String> usageTypesSet = new HashSet(listParams(query, "usageType"));
+            HashSet<String> regionsSet = new HashSet(listParams(query, "region"));
+            Map<Tag, Integer> reservationData = Maps.newTreeMap();
+            Map<String, ApplicationGroup> appgroups = getConfig().applicationGroupService.getApplicationGroups();
+            for (String name: appgroups.keySet()) {
+                appgroup = appgroups.get(name);
+                if (appgroup.reservations == null)
+                    continue;
+                Integer numInstances = 0;
+                for (String singleReservationKey: appgroup.reservations.keySet() ){
+                    String instanceType = appgroup.reservations.get(singleReservationKey).get('InstanceType');
+                    String availability = appgroup.reservations.get(singleReservationKey).get('AvailabilityZone');
+                    if( ( usageTypesSet.contains(instanceType) && regionsSet.contains( availability.substring(0, availability.length()-1) ) ) ){
+                        numInstances += appgroup.reservations.get(singleReservationKey).get('GroupInstaneCount').toInteger();
+                    }
+                }
+                reservationData.put(new com.netflix.ice.tag.ApplicationGroup(name), numInstances);
+            }
+
+            def reserved_result = [status: 200, data: reservationData, groupBy: groupBy == null ? "None" : groupBy.name()];
+            return reserved_result;
+        }
+
         boolean isCost = query.getBoolean("isCost");
         boolean breakdown = query.getBoolean("breakdown");
         boolean showsps = query.getBoolean("showsps");

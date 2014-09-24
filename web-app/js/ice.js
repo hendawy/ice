@@ -1485,6 +1485,134 @@ function breakdownCtrl($scope, $location, $http, usage_db, highchart) {
   jQuery('#end').datepicker().val($scope.end);
 }
 
+function resbreakdownCtrl($scope, $location, $http, usage_db, highchart) {
+
+  $scope.showResourceGroups = true;
+  $scope.usage_cost = "cost";
+
+  $scope.groupBys = [{name: "ResourceGroup"}, {name: "ApplicationGroup"}];
+  $scope.groupBy = $scope.groupBys[0];
+  $scope.consolidate = "weekly";
+  $scope.end = new Date();
+  $scope.end = highchart.dayFormat($scope.end); //$filter('date')($scope.end, "y-MM-dd hha");
+  $scope.spans = 4;
+
+  $scope.deleteAppGroup = function(appgroup) {
+    var r = confirm("Are you sure to delete application group \"" + appgroup + "\"?");
+    if (r) {
+      $http({
+        method: "GET",
+        url: "deleteApplicationGroup",
+        params: {name: appgroup}
+      }).success(function(result) {
+        if (result.status === 200) {
+          $scope.message = "Application group " + appgroup + " has been deleted.";
+          $scope.getData();
+        }
+      });
+    }
+  }
+
+  $scope.updateUrl = function() {
+    var params = {
+      groupBy: $scope.groupBy.name,
+      showResourceGroups: "" + $scope.showResourceGroups,
+      account: {selected: $scope.selected_accounts, from: $scope.accounts},
+      region: {selected: $scope.selected_regions, from: $scope.regions},
+      product: {selected: $scope.selected_products, from: $scope.products},
+      operation: {selected: $scope.selected_operations, from: $scope.operations},
+      usageType: {selected: $scope.selected_usageTypes, from: $scope.usageTypes}
+    };
+    usage_db.updateUrl($location, params);
+  }
+
+  $scope.order = function(index) {
+
+    if ($scope.predicate != index) {
+      $scope.reservse = index === 'name';
+      $scope.predicate = index;
+    }
+    else {
+      $scope.reservse = !$scope.reservse;
+    }
+    var compare = function (a,b) {
+      if (a[index] < b[index])
+         return !$scope.reservse ? 1 : -1;
+      if (a[index] > b[index])
+        return !$scope.reservse ? -1 : 1;
+      return 0;
+    }
+    $scope.data.sort(compare);
+  }
+
+  $scope.getData = function() {
+    $scope.loading = true;
+    usage_db.getData($scope, function(result){
+      $scope.data = [];
+      for (var key in result['data']) {
+        var reservedInstancesCount = {};
+        reservedInstancesCount.name = key;
+        reservedInstancesCount.value = result['data'][key];
+        $scope.data.push(reservedInstancesCount);
+      }
+      $scope.loading = false;
+    }, {breakdown: true, resbreakdown: true, spans: $scope.spans});
+
+    $scope.legendName = $scope.groupBy.name;
+  }
+
+  $scope.usa
+
+  $scope.accountsChanged = function() {
+      $scope.updateRegions();
+  }
+
+  $scope.regionsChanged = function() {
+      $scope.updateProducts();
+  }
+
+  $scope.productsChanged = function() {
+    $scope.updateOperations();
+  }
+
+  $scope.operationsChanged = function() {
+      $scope.updateUsageTypes();
+  }
+
+  $scope.updateUsageTypes = function() {
+    usage_db.getUsageTypes($scope, function(data){
+    });
+  }
+
+  $scope.updateOperations = function() {
+    usage_db.getOperations($scope, function(data){
+      $scope.updateUsageTypes();
+    });
+  }
+
+  $scope.updateProducts = function() {
+    usage_db.getProducts($scope, function(data){
+      $scope.updateOperations();
+    });
+  }
+
+  $scope.updateRegions = function() {
+    usage_db.getRegions($scope, function(data){
+      $scope.updateProducts();
+    });
+  }
+
+  usage_db.getParams($location.hash(), $scope);
+  if ($scope.end.length > 10)
+    $scope.end = $scope.end.substr(0, 10)
+
+  usage_db.getAccounts($scope, function(data){
+    $scope.updateRegions();
+  });
+
+  $scope.getData();
+}
+
 function summaryCtrl($scope, $location, usage_db, highchart) {
 
   $scope.usage_cost = "cost";
@@ -1804,4 +1932,3 @@ function editCtrl($scope, $location, $http) {
     }
   });
 }
-

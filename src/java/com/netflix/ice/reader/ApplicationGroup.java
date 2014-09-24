@@ -30,6 +30,7 @@ import java.util.Map;
 
 public class ApplicationGroup {
     public final Map<String, List<String>> data;
+    public final Map<String, Map<String, String>> reservations;
     public final String name;
     public final String owner;
 
@@ -41,24 +42,44 @@ public class ApplicationGroup {
         this.data.put("rds", Lists.<String>newArrayList());
         this.data.put("ec2", ec2s);
         this.data.put("s3", s3s);
+        reservations = Maps.newHashMap(); //TODO: Enable adding reservations
     }
 
     public ApplicationGroup(String name, String owner, Map<String, List<String>> data) {
         this.name = name;
         this.owner = owner;
         this.data = data;
+        reservations = Maps.newHashMap(); //TODO: Enable adding reservations
     }
 
     public ApplicationGroup(String jsonStr) throws JSONException {
         data = Maps.newHashMap();
+        reservations = Maps.newHashMap();
         JSONObject json = new JSONObject(new JSONTokener(jsonStr));
         name = json.getString("name");
         owner = json.getString("owner");
-        json = json.getJSONObject("data");
-        Iterator<String> keys = json.keys();
+        JSONObject dataJson = json.getJSONObject("data");
+        JSONObject reservationJson = json.getJSONObject("reserved");
+
+        Iterator<String> reservationKeys = reservationJson.keys();
+        while (reservationKeys.hasNext()) {
+            String key = reservationKeys.next();
+            JSONObject singleReservationJson = reservationJson.getJSONObject(key);
+
+            Iterator<String> singleReservationKeysIt = singleReservationJson.keys();
+            Map<String, String> singleReservationProperties = Maps.newHashMap();
+            while (singleReservationKeysIt.hasNext()) {
+                String singleKey = singleReservationKeysIt.next();
+                String singleValue = singleReservationJson.getString(singleKey);
+                singleReservationProperties.put(singleKey, singleValue);
+            }
+            reservations.put(key, singleReservationProperties);
+        }
+
+        Iterator<String> keys = dataJson.keys();
         while (keys.hasNext()) {
             String key = keys.next();
-            JSONArray jsonArray = json.getJSONArray(key);
+            JSONArray jsonArray = dataJson.getJSONArray(key);
             List<String> values = Lists.newArrayList();
             for (int i = 0; i < jsonArray.length(); i++)
                 values.add(jsonArray.getString(i));
